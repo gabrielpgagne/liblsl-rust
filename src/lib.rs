@@ -38,6 +38,13 @@ use std::fmt;
 use std::rc;
 use std::vec;
 
+#[cfg(target_os = "android")]
+#[allow(non_camel_case_types)]
+type c_char = u8;
+#[cfg(not(target_os = "android"))]
+#[allow(non_camel_case_types)]
+type c_char = i8;
+
 /// Constant to indicate that a stream has variable sampling rate.
 pub const IRREGULAR_RATE: f64 = 0.0;
 
@@ -186,7 +193,6 @@ pub fn local_clock() -> f64 {
     unsafe { lsl_local_clock() }
 }
 
-
 // ==========================
 // === Stream Declaration ===
 // ==========================
@@ -270,7 +276,9 @@ impl StreamInfo {
                 source_id.as_ptr(),
             );
             match handle.is_null() {
-                false => Ok(StreamInfo { handle: rc::Rc::new(StreamInfoHandle { handle }) }),
+                false => Ok(StreamInfo {
+                    handle: rc::Rc::new(StreamInfoHandle { handle }),
+                }),
                 true => Err(Error::ResourceCreation),
             }
         }
@@ -290,7 +298,7 @@ impl StreamInfo {
     experimenter).
     */
     pub fn stream_name(&self) -> String {
-        unsafe { make_string(lsl_get_name(self.handle.handle )) }
+        unsafe { make_string(lsl_get_name(self.handle.handle)) }
     }
 
     /**
@@ -303,7 +311,7 @@ impl StreamInfo {
     search for: XDF meta-data).
     */
     pub fn stream_type(&self) -> String {
-        unsafe { make_string(lsl_get_type(self.handle.handle )) }
+        unsafe { make_string(lsl_get_type(self.handle.handle)) }
     }
 
     /**
@@ -311,7 +319,7 @@ impl StreamInfo {
     A stream has at least one channel; the channel count stays constant for all samples.
     */
     pub fn channel_count(&self) -> i32 {
-        unsafe { lsl_get_channel_count(self.handle.handle ) }
+        unsafe { lsl_get_channel_count(self.handle.handle) }
     }
 
     /**
@@ -418,7 +426,7 @@ impl StreamInfo {
                 cursor: lsl_get_desc(self.handle.handle),
                 // keep a shared ref of the underlying native handle since the xml element or
                 // elements obtained from it may outlive the StreamInfo object
-                doc: self.handle.clone()
+                doc: self.handle.clone(),
             }
         }
     }
@@ -487,7 +495,9 @@ impl StreamInfo {
         unsafe {
             let handle = lsl_streaminfo_from_xml(xml.as_ptr());
             match handle.is_null() {
-                false => Ok(StreamInfo { handle: rc::Rc::new(StreamInfoHandle { handle }) }),
+                false => Ok(StreamInfo {
+                    handle: rc::Rc::new(StreamInfoHandle { handle }),
+                }),
                 true => Err(Error::ResourceCreation),
             }
         }
@@ -506,7 +516,9 @@ impl StreamInfo {
             !handle.is_null(),
             "Attempted to create a StreamInfo from a NULL handle."
         );
-        StreamInfo { handle: rc::Rc::new(StreamInfoHandle { handle } ) }
+        StreamInfo {
+            handle: rc::Rc::new(StreamInfoHandle { handle }),
+        }
     }
 
     // Get the native implementation handle.
@@ -523,7 +535,9 @@ impl Clone for StreamInfo {
                 !handle.is_null(),
                 "Failed to clone native lsl_streaminfo object."
             );
-            StreamInfo { handle: rc::Rc::new(StreamInfoHandle { handle }) }
+            StreamInfo {
+                handle: rc::Rc::new(StreamInfoHandle { handle }),
+            }
         }
     }
 }
@@ -678,7 +692,12 @@ impl StreamOutlet {
     ) -> Result<()> {
         self.assert_len(data.len());
         unsafe {
-            errcode_to_result(func(self.handle, data.as_ptr(), timestamp, pushthrough as i32))?;
+            errcode_to_result(func(
+                self.handle,
+                data.as_ptr(),
+                timestamp,
+                pushthrough as i32,
+            ))?;
         }
         Ok(())
     }
@@ -888,56 +907,101 @@ pub trait ExPushable<T>: HasNominalRate {
 }
 
 impl ExPushable<vec::Vec<f32>> for StreamOutlet {
-    fn push_sample_ex(&self, data: &vec::Vec<f32>, timestamp: f64, pushthrough: bool) -> Result<()> {
+    fn push_sample_ex(
+        &self,
+        data: &vec::Vec<f32>,
+        timestamp: f64,
+        pushthrough: bool,
+    ) -> Result<()> {
         self.safe_push_numeric(lsl_push_sample_ftp, data, timestamp, pushthrough)
     }
 }
 
 impl ExPushable<vec::Vec<f64>> for StreamOutlet {
-    fn push_sample_ex(&self, data: &vec::Vec<f64>, timestamp: f64, pushthrough: bool) -> Result<()> {
+    fn push_sample_ex(
+        &self,
+        data: &vec::Vec<f64>,
+        timestamp: f64,
+        pushthrough: bool,
+    ) -> Result<()> {
         self.safe_push_numeric(lsl_push_sample_dtp, data, timestamp, pushthrough)
     }
 }
 
-impl ExPushable<vec::Vec<i8>> for StreamOutlet {
-    fn push_sample_ex(&self, data: &vec::Vec<i8>, timestamp: f64, pushthrough: bool) -> Result<()> {
+impl ExPushable<vec::Vec<c_char>> for StreamOutlet {
+    fn push_sample_ex(
+        &self,
+        data: &vec::Vec<c_char>,
+        timestamp: f64,
+        pushthrough: bool,
+    ) -> Result<()> {
         self.safe_push_numeric(lsl_push_sample_ctp, data, timestamp, pushthrough)
     }
 }
 
 impl ExPushable<vec::Vec<i16>> for StreamOutlet {
-    fn push_sample_ex(&self, data: &vec::Vec<i16>, timestamp: f64, pushthrough: bool) -> Result<()> {
+    fn push_sample_ex(
+        &self,
+        data: &vec::Vec<i16>,
+        timestamp: f64,
+        pushthrough: bool,
+    ) -> Result<()> {
         self.safe_push_numeric(lsl_push_sample_stp, data, timestamp, pushthrough)
     }
 }
 
 impl ExPushable<vec::Vec<i32>> for StreamOutlet {
-    fn push_sample_ex(&self, data: &vec::Vec<i32>, timestamp: f64, pushthrough: bool) -> Result<()> {
+    fn push_sample_ex(
+        &self,
+        data: &vec::Vec<i32>,
+        timestamp: f64,
+        pushthrough: bool,
+    ) -> Result<()> {
         self.safe_push_numeric(lsl_push_sample_itp, data, timestamp, pushthrough)
     }
 }
 
 #[cfg(not(windows))] // TODO: once we upgrade to liblsl 1.14, we can drop this platform restriction
 impl ExPushable<vec::Vec<i64>> for StreamOutlet {
-    fn push_sample_ex(&self, data: &vec::Vec<i64>, timestamp: f64, pushthrough: bool) -> Result<()> {
+    fn push_sample_ex(
+        &self,
+        data: &vec::Vec<i64>,
+        timestamp: f64,
+        pushthrough: bool,
+    ) -> Result<()> {
         self.safe_push_numeric(lsl_push_sample_ltp, data, timestamp, pushthrough)
     }
 }
 
 impl ExPushable<vec::Vec<String>> for StreamOutlet {
-    fn push_sample_ex(&self, data: &vec::Vec<String>, timestamp: f64, pushthrough: bool) -> Result<()> {
+    fn push_sample_ex(
+        &self,
+        data: &vec::Vec<String>,
+        timestamp: f64,
+        pushthrough: bool,
+    ) -> Result<()> {
         self.safe_push_blob(data, timestamp, pushthrough)
     }
 }
 
 impl ExPushable<vec::Vec<&str>> for StreamOutlet {
-    fn push_sample_ex(&self, data: &vec::Vec<&str>, timestamp: f64, pushthrough: bool) -> Result<()> {
+    fn push_sample_ex(
+        &self,
+        data: &vec::Vec<&str>,
+        timestamp: f64,
+        pushthrough: bool,
+    ) -> Result<()> {
         self.safe_push_blob(data, timestamp, pushthrough)
     }
 }
 
 impl ExPushable<vec::Vec<&[u8]>> for StreamOutlet {
-    fn push_sample_ex(&self, data: &vec::Vec<&[u8]>, timestamp: f64, pushthrough: bool) -> Result<()> {
+    fn push_sample_ex(
+        &self,
+        data: &vec::Vec<&[u8]>,
+        timestamp: f64,
+        pushthrough: bool,
+    ) -> Result<()> {
         self.safe_push_blob(data, timestamp, pushthrough)
     }
 }
@@ -1377,7 +1441,7 @@ impl StreamInlet {
     Returns the time stamp of the sample or 0.0 if no new data was available within the given
     timeout.
     */
-    fn safe_pull_numeric_buf<T: Clone + From<i8>>(
+    fn safe_pull_numeric_buf<T: Clone + From<c_char>>(
         &self,
         func: NativePullFunction<T>,
         buf: &mut vec::Vec<T>,
@@ -1408,7 +1472,7 @@ impl StreamInlet {
     * `func`: the native FFI function to call to pull a sample
     * `timeout`: the timeout to pass in
     */
-    fn safe_pull_numeric<T: Clone + From<i8>>(
+    fn safe_pull_numeric<T: Clone + From<c_char>>(
         &self,
         func: NativePullFunction<T>,
         timeout: f64,
@@ -1645,12 +1709,12 @@ impl Pullable<i16> for StreamInlet {
     }
 }
 
-impl Pullable<i8> for StreamInlet {
-    fn pull_sample(&self, timeout: f64) -> Result<(vec::Vec<i8>, f64)> {
+impl Pullable<c_char> for StreamInlet {
+    fn pull_sample(&self, timeout: f64) -> Result<(vec::Vec<c_char>, f64)> {
         self.safe_pull_numeric(lsl_pull_sample_c, timeout)
     }
 
-    fn pull_sample_buf(&self, buf: &mut vec::Vec<i8>, timeout: f64) -> Result<f64> {
+    fn pull_sample_buf(&self, buf: &mut vec::Vec<c_char>, timeout: f64) -> Result<f64> {
         self.safe_pull_numeric_buf(lsl_pull_sample_c, buf, timeout)
     }
 }
@@ -2110,7 +2174,9 @@ impl Drop for ContinuousResolver {
 
 // wrapper around a native streaminfo handle
 #[derive(Debug)]
-struct StreamInfoHandle { handle: lsl_streaminfo }
+struct StreamInfoHandle {
+    handle: lsl_streaminfo,
+}
 
 impl Drop for StreamInfoHandle {
     fn drop(&mut self) {
@@ -2213,9 +2279,7 @@ impl std::error::Error for Error {}
 fn make_cstring(s: &str) -> ffi::CString {
     // If you're getting this, you passed a string containing 0 bytes to the library. In the
     // context where it happened, this is a fatal error.
-    ffi::CString::new(s).expect(
-        "Embedded zero bytes are invalid in strings passed to liblsl.",
-    )
+    ffi::CString::new(s).expect("Embedded zero bytes are invalid in strings passed to liblsl.")
 }
 
 // Internal function that creates a String from a const char* returned by a trusted C routine.
