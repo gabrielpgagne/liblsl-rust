@@ -33,17 +33,10 @@ the main objects (`StreamInfo`, `StreamOutlet`, `StreamInlet`, `ContinuousResolv
 
 use lsl_sys::*;
 use std::convert::{From, TryFrom};
-use std::ffi;
+use std::ffi::{self, c_char};
 use std::fmt;
 use std::rc;
 use std::vec;
-
-#[cfg(target_os = "android")]
-#[allow(non_camel_case_types)]
-type c_char = u8;
-#[cfg(not(target_os = "android"))]
-#[allow(non_camel_case_types)]
-type c_char = i8;
 
 /// Constant to indicate that a stream has variable sampling rate.
 pub const IRREGULAR_RATE: f64 = 0.0;
@@ -729,7 +722,7 @@ impl StreamOutlet {
         unsafe {
             errcode_to_result(lsl_push_sample_buftp(
                 self.handle,
-                ptrs.as_ptr() as *mut *const std::os::raw::c_char,
+                ptrs.as_ptr() as *mut *const c_char,
                 lens.as_ptr(),
                 timestamp,
                 pushthrough as i32,
@@ -1504,7 +1497,7 @@ impl StreamInlet {
         timeout: f64,
     ) -> Result<f64> {
         let mut ec = [0 as i32];
-        let mut ptrs = vec![0 as *mut ::std::os::raw::c_char; self.channel_count];
+        let mut ptrs = vec![0 as *mut c_char; self.channel_count];
         let mut lens = vec![0 as u32; self.channel_count];
         unsafe {
             let ts = lsl_pull_sample_buf(
@@ -1544,7 +1537,7 @@ impl StreamInlet {
         timeout: f64,
     ) -> Result<(vec::Vec<T>, f64)> {
         let mut ec = [0 as i32];
-        let mut ptrs = vec![0 as *mut ::std::os::raw::c_char; self.channel_count];
+        let mut ptrs = vec![0 as *mut c_char; self.channel_count];
         let mut lens = vec![0 as u32; self.channel_count];
         // we're not calling safe_pull_blob_buf here since that would make unnecessary allocations
         // if there was no new data
@@ -2286,7 +2279,7 @@ fn make_cstring(s: &str) -> ffi::CString {
 // Replaces invalid bytes by placeholder UTF8 characters. This function *panics* if a null pointer
 // is given it it, and therefore it should only be used with API return values where that's
 // unexpected, i.e., fatal.
-unsafe fn make_string(s: *const ::std::os::raw::c_char) -> String {
+unsafe fn make_string(s: *const c_char) -> String {
     // If this happens, the native library has returned a NULL pointer in a place where it
     // should not. This indicates a fatal library bug.
     assert!(
